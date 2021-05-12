@@ -2,85 +2,164 @@
 <html>
   <head>
     <title>Socket.IO chat</title>
+    <link rel="stylesheet" href="./public/css/style.css" />
     <style>
+      * {
+        margin: 2px;
+        padding: 0;
+        box-sizing: border-box;
+      }
       body {
-        margin: 0;
-        padding-bottom: 3rem;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          Helvetica, Arial, sans-serif;
+        font: 13px Helvetica, Arial;
       }
 
-      #form {
-        background: rgba(0, 0, 0, 0.15);
-        padding: 0.25rem;
+	  .container{
+		  display: grid;
+		  grid-template-columns: 2fr 3fr;
+		  grid-template-rows: auto;
+	  }
+
+	  .chat-input{
+		  align-content: center;
+	  }
+      form {
+        background: #000;
+        padding: 3px;
         position: fixed;
         bottom: 0;
-        left: 0;
-        right: 0;
-        display: flex;
-        height: 3rem;
-        box-sizing: border-box;
-        backdrop-filter: blur(10px);
+        width: 100%;
       }
-      #input {
+      form input {
+        border: 0;
+        padding: 10px;
+        width: 90%;
+        margin-right: 0.5%;
+      }
+      form button {
+        width: 9%;
+        background: rgb(130, 224, 255);
         border: none;
-        padding: 0 1rem;
-        flex-grow: 1;
-        border-radius: 2rem;
-        margin: 0.25rem;
+        padding: 10px;
       }
-      #input:focus {
-        outline: none;
-      }
-      #form > button {
-        background: #333;
-        border: none;
-        padding: 0 1rem;
-        margin: 0.25rem;
-        border-radius: 3px;
-        outline: none;
-        color: #fff;
-      }
-
       #messages {
         list-style-type: none;
         margin: 0;
         padding: 0;
       }
-      #messages > li {
-        padding: 0.5rem 1rem;
+      #messages li {
+        padding: 5px 10px;
       }
-      #messages > li:nth-child(odd) {
-        background: #efefef;
+      #messages li:nth-child(odd) {
+        background: #eee;
+      }
+      #messages {
+        margin-bottom: 40px;
+      }
+
+      .set-name > input {
+        width: 25%;
+        padding: 10px;
       }
     </style>
   </head>
   <body>
-    <ul id="messages"></ul>
-    <form id="form" action="">
-      <input id="input" autocomplete="off" /><button>Send</button>
-    </form>
+	  <div class="container">
+
+
+		<section class="set-name">
+		<input id="boxNick" type="text" placeholder="Enter Username" size="13" />
+		<button type="submit" id="buttonNick" onClick="setMyName()">Set</button>
+		<ul id="ulist"></ul>
+		</section>
+
+		<section class="main-chat">
+			<h2>Messages</h2>
+			<ul id="messages"></ul>
+		</section>
+
+		<section class='chat-input'>
+			<form action="">
+				<input id="boxMessage" autocomplete="off" disabled="true" /><button
+				id="buttonMessage"
+				disabled="true"
+				>
+				Send
+				</button>
+			</form>
+		</section>
+	</div>
+
 
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://code.jquery.com/jquery-1.11.1.js"></script>
     <script>
+      var usersList = [];
+      var myNick = "";
+      isTyping = false;
+
       var socket = io();
 
-      var form = document.getElementById("form");
-      var input = document.getElementById("input");
+      socket.on("connect", function (e) {
+        socket.emit("start");
+      });
 
-      form.addEventListener("submit", function (e) {
-        e.preventDefault();
-        if (input.value) {
-          socket.emit("chat message", input.value);
-          input.value = "";
-        }
+      socket.on("nick", function (nick) {
+        myNick = nick;
+      });
+
+      $("form").submit(function () {
+        var temp = [myNick, $("#boxMessage").val()];
+        socket.emit("send chat message", temp);
+        $("#boxMessage").val("");
+        imTyping = false;
+        socket.emit("not typing");
+        return false;
       });
 
       socket.on("chat message", function (msg) {
-        var item = document.createElement("li");
-        item.textContent = msg;
-        messages.appendChild(item);
-        window.scrollTo(0, document.body.scrollHeight);
+        $("#messages").append("<li><b>" + msg[0] + ":</b> " + msg[1]);
+      });
+
+      socket.on("info", function (inf) {
+        $("#messages").append("<li><i>" + inf + "</i></li>");
+      });
+
+      socket.on("users list", function (usersList) {
+        updateUserList(usersList);
+      });
+
+      socket.on("typing signal", function (usersList) {
+        updateUserList(usersList);
+      });
+
+      function setMyName() {
+        myNick = document.getElementById("boxNick").value;
+        socket.emit("set nick", myNick);
+        document.getElementById("boxNick").disabled = true;
+        document.getElementById("buttonNick").hidden = true;
+        document.getElementById("boxMessage").disabled = false;
+        document.getElementById("buttonMessage").disabled = false;
+      }
+
+      function updateUserList(u) {
+        var list = document.getElementById("ulist");
+        list.innerHTML = "";
+
+        for (var i = 0; i < u.length; i++) {
+          var item = document.createElement("li");
+          item.innerHTML = u[i];
+          list.appendChild(item);
+        }
+      }
+
+      $("#boxMessage").on("input", function () {
+        if ($("#boxMessage").val().length != "" && isTyping == false) {
+          socket.emit("typing");
+          isTyping = true;
+        } else if ($("#boxMessage").val() == "") {
+          socket.emit("not typing");
+          isTyping = false;
+        }
       });
     </script>
   </body>
